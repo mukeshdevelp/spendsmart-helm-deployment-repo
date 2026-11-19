@@ -1,0 +1,220 @@
+nameOverride: ""
+fullnameOverride: ""
+
+# Optional hostname for VM / dev installs (see values-vm.yaml).
+global:
+  publicHost: ""
+
+# Private registry pull secret(s). Empty when nodes pull via cloud IAM.
+imagePullSecrets: []
+
+backend:
+  enabled: true
+
+  image:
+    repository: ""
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8000
+    nodePort: null
+
+  serviceAccount:
+    name: uniteconpro-backend
+
+  envFrom:
+    - secretRef:
+        name: encryption-key
+    - secretRef:
+        name: clickhouse
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  annotations: {}
+
+  probes:
+    liveness:
+      httpGet:
+        path: /api/v1/healthz
+        port: 8000
+      initialDelaySeconds: 15
+      periodSeconds: 20
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+    readiness:
+      httpGet:
+        path: /api/v1/readyz
+        port: 8000
+      initialDelaySeconds: 20
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+engine:
+  enabled: true
+
+  schedule: "5 11,23 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  suspend: false
+
+  image:
+    repository: ""
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  serviceAccount:
+    name: uniteconpro-sa
+
+  command:
+    - python
+    - app.py
+
+  args:
+    - --mode
+    - refresh_days
+    - --cloud
+    - aws
+    - --service
+    - all
+    - --days
+    - "2"
+
+  envFrom:
+    - secretRef:
+        name: clickhouse-db
+    - secretRef:
+        name: encryption-key
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+frontend:
+  enabled: true
+
+  image:
+    repository: ""
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+    nodePort: null
+
+  serviceAccount:
+    name: uniteconpro-frontend
+
+  configMap:
+    name: uniteconpro-frontend
+    data:
+      VITE_API_BASE_URL: ""
+      VITE_CLOUD_SENTRY_API_BASE_URL: ""
+      VITE_KEYCLOAK_CLIENT_ID: spendsmart-frontend
+      VITE_KEYCLOAK_REALM: spendsmart
+      VITE_KEYCLOAK_URL: ""
+
+  nginx:
+    enabled: true
+
+    configMap:
+      name: spendsmart-frontend-nginx
+
+    csp:
+      connectSrc:
+        - "'self'"
+        - "wss:"
+      frameSrc:
+        - "'self'"
+        - "https:"
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  annotations: {}
+
+cloudsentry:
+  enabled: false
+
+  image:
+    repository: ""
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8000
+    nodePort: null
+
+  serviceAccount:
+    name: cloud-sentry
+
+  envFrom:
+    - secretRef:
+        name: aws-access
+    - secretRef:
+        name: base-url
+    - secretRef:
+        name: gemini-key
+    - secretRef:
+        name: postgres-config
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+keycloak:
+  enabled: false
+  fullnameOverride: keycloak
+  replicas: 1
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: latest
+    pullPolicy: IfNotPresent
+  args:
+    - start-dev
+  admin:
+    existingSecret: keycloak-admin
+    usernameKey: username
+    passwordKey: password
+  extraEnv:
+    - name: KC_HTTP_PORT
+      value: "8080"
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+    nodePort: null
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1536Mi

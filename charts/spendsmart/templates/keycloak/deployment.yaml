@@ -1,0 +1,48 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "spendsmart.keycloak.fullname" . }}
+  labels:
+    {{- include "spendsmart.labels" . | nindent 4 }}
+    app: {{ include "spendsmart.keycloak.fullname" . }}
+spec:
+  replicas: {{ .Values.keycloak.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "spendsmart.keycloak.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "spendsmart.keycloak.fullname" . }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: keycloak
+          image: "{{ .Values.keycloak.image.repository }}:{{ .Values.keycloak.image.tag }}"
+          imagePullPolicy: {{ .Values.keycloak.image.pullPolicy }}
+          args:
+            {{- toYaml .Values.keycloak.args | nindent 12 }}
+          env:
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.admin.existingSecret }}
+                  key: {{ .Values.keycloak.admin.usernameKey }}
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.admin.existingSecret }}
+                  key: {{ .Values.keycloak.admin.passwordKey }}
+            {{- range .Values.keycloak.extraEnv }}
+            - {{- toYaml . | nindent 14 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.keycloak.service.targetPort }}
+          resources:
+            {{- toYaml .Values.keycloak.resources | nindent 12 }}
+{{- end }}

@@ -1,0 +1,21 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "spendsmart.keycloak.fullname" . }}
+  labels:
+    {{- include "spendsmart.labels" . | nindent 4 }}
+    app: {{ include "spendsmart.keycloak.fullname" . }}
+spec:
+  type: {{ .Values.keycloak.service.type }}
+  selector:
+    app: {{ include "spendsmart.keycloak.fullname" . }}
+  ports:
+    - name: http
+      port: {{ .Values.keycloak.service.port }}
+      targetPort: {{ .Values.keycloak.service.targetPort }}
+      protocol: TCP
+      {{- if and (eq .Values.keycloak.service.type "NodePort") .Values.keycloak.service.nodePort }}
+      nodePort: {{ .Values.keycloak.service.nodePort }}
+      {{- end }}
+{{- end }}

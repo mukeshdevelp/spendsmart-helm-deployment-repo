@@ -1,0 +1,82 @@
+# GCP VM / existing cluster profile. Use with:
+#   helm upgrade --install spendsmart ./charts/spendsmart -f values.yaml -f values-vm.yaml -f deploy/generated-public-urls.yaml
+
+global:
+  publicHost: ""
+
+imagePullSecrets:
+  - name: harbor-regcred
+
+harbor:
+  server: harbor.ldc.opstree.dev
+
+backend:
+  image:
+    repository: harbor.ldc.opstree.dev/coe/uniteconpro-backend-prod
+    tag: latest
+  service:
+    type: NodePort
+    port: 80
+    targetPort: 8000
+    nodePort: 30081
+
+frontend:
+  image:
+    repository: harbor.ldc.opstree.dev/coe/uniteconpro-frontend-prod
+    tag: latest
+  service:
+    type: NodePort
+    port: 80
+    targetPort: 80
+    nodePort: 30080
+  configMap:
+    name: uniteconpro-frontend
+    data:
+      VITE_API_BASE_URL: ""
+      VITE_CLOUD_SENTRY_API_BASE_URL: ""
+      VITE_KEYCLOAK_CLIENT_ID: spendsmart-frontend
+      VITE_KEYCLOAK_REALM: spendsmart
+      VITE_KEYCLOAK_URL: ""
+  nginx:
+    enabled: true
+    configMap:
+      name: spendsmart-frontend-nginx
+    csp:
+      connectSrc:
+        - "'self'"
+        - "wss:"
+      frameSrc:
+        - "'self'"
+        - "https:"
+
+engine:
+  enabled: true
+  image:
+    repository: harbor.ldc.opstree.dev/coe/uniteconpro-engine-dev
+    tag: latest
+  args:
+    - --mode
+    - refresh_days
+    - --cloud
+    - gcp
+    - --service
+    - all
+    - --days
+    - "2"
+
+cloudsentry:
+  enabled: false
+  image:
+    repository: harbor.ldc.opstree.dev/coe/cloud-sentry-dev
+    tag: latest
+  service:
+    type: NodePort
+    nodePort: 30082
+
+keycloak:
+  enabled: true
+  service:
+    type: NodePort
+    port: 8080
+    targetPort: 8080
+    nodePort: 30083
